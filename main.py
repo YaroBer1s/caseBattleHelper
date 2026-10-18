@@ -93,7 +93,7 @@ def get_case_reference_price(case: dict):
     for name, price in CASE_PRICES.items():
         if title == name.strip().casefold() or (slug and slug == CASE_SLUGS.get(name, "").casefold()):
             try:
-                price = float(price)
+                price = int(price)
             except (TypeError, ValueError):
                 return None
             return price if price > 0 else None
@@ -211,7 +211,7 @@ def case_part(d: dict, case: dict) -> str:
             if case.get(key) is not None:
                 extra = f"цена {case[key]}"
                 break
-        return f"кейс «{title}»" + (f" ({extra})" if extra else "")
+        return f"Кейс «{title}» ({get_case_reference_price(case)} RUB)" + (f" ({extra})" if extra else "")
     src = d.get("source")
     return SOURCE_NAMES.get(src, f"source={src}")
 
@@ -234,7 +234,7 @@ def summarize(d: dict, online) -> str:
         datetime.now().strftime("%H:%M:%S"),
         #f"онлайн {online if online is not None else '?'}",
         paint(item_name, color),
-        f"предмет {price if price is not None else '?'}",
+        f"{price if price is not None else '?'} RUB",
         case_part(d, case)
     ]
     return " · ".join(parts)
