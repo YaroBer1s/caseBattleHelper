@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-#daum342
 """Слушает живую ленту дропов сайта по WebSocket, печатает короткие строки и пишет JSONL.
 
 Установка:
@@ -9,7 +8,7 @@
 Запуск:
     python parse_drops.py https://site.example
     python parse_drops.py https://site.example --ws wss://ws.site.example/path
-    python parse_drops.py https://site.example --raw     # показать полный JSON первых сообщений
+    python parse_drops.py https://site.example --raw -показать полный JSON первых сообщений
 
 Если адрес WebSocket со страницы не нашёлся, возьмите его вручную:
 DevTools -> Network -> фильтр WS -> обновить страницу -> скопировать URL.
@@ -19,7 +18,6 @@ import asyncio
 import base64
 import json
 import os
-from os import system
 import html as html_lib
 import re
 import sys
@@ -29,6 +27,7 @@ from datetime import datetime
 
 import requests
 import websockets
+import subprocess
 
 # Консоль Windows часто не в UTF-8, а в названиях есть кириллица и "★": без этого будет UnicodeEncodeError.
 for _stream in (sys.stdout, sys.stderr):
@@ -52,11 +51,11 @@ TYPE_CONTAINER = 65  # asset.type: предмет сам является кей
 
 # Цвета названия по редкости (номера 256-цветной палитры ANSI).
 # Группировка повторяет схему самого сайта (enums-*.js), цвета как в CS. Меняйте числа под себя.
-_C = {"base": 250, "industrial": 117, "milspec": 33, "restricted": 99,
+_C = {"base": 250, "industrial": 117, "mil_spec": 33, "restricted": 99,
       "classified": 205, "covert": 196, "rare": 220}
 RARITY_COLORS = {
     10: _C["base"], 11: _C["base"], 20: _C["industrial"],
-    30: _C["milspec"], 32: _C["milspec"], 100: _C["milspec"],
+    30: _C["mil_spec"], 32: _C["mil_spec"], 100: _C["mil_spec"],
     40: _C["restricted"], 42: _C["restricted"], 70: _C["restricted"], 90: _C["restricted"],
     50: _C["classified"], 52: _C["classified"], 75: _C["classified"],
     60: _C["covert"], 62: _C["covert"],
@@ -69,8 +68,7 @@ def setup_colors(disable: bool) -> bool:
     """Цвета только в живой консоли: не в файле/пайпе, не при NO_COLOR и не при --no-color."""
     if disable or os.environ.get("NO_COLOR") or not sys.stdout.isatty():
         pass
-    if os.name == "nt":
-        system("")  # включает обработку ANSI-последовательностей в консоли Windows 10+
+    # включает обработку ANSI-последовательностей в консоли Windows 10+
     return True
 
 
@@ -225,9 +223,8 @@ def case_part(d: dict, case: dict) -> str:
     return SOURCE_NAMES.get(src, f"source={src}")
 
 
-def summarize(d: dict, online) -> str:
+def summarize(d: dict) -> str:
     asset = d.get("asset") or {}
-    #user = d.get("user") or {}
     case = d.get("case") or {}
     case_price = get_case_reference_price(case)
     price = d.get("price") if d.get("price") is not None else asset.get("price")
@@ -270,11 +267,11 @@ def summarize(d: dict, online) -> str:
     return " · ".join(parts)
 
 
-def store(drops, out, dedup: Dedup, online) -> int:
+def store(drops, out, dedup: Dedup) -> int:
     new = 0
 
     if drops:
-        os.system("cls" if os.name == "nt" else "clear")
+        subprocess.run("cls" if os.name == "nt" else "clear",)
         for d in drops:
             if d.get("source") in (2, 3):
                 continue
@@ -283,7 +280,7 @@ def store(drops, out, dedup: Dedup, online) -> int:
                 continue
             new += 1
             out.write(json.dumps({"ts": time.time(), "drop": d}, ensure_ascii=False) + "\n")
-            print(summarize(d, online), flush=True)
+            print(summarize(d), flush=True)
 
         if len(last_rois) > 0:
             sum_roi = 0
@@ -324,7 +321,7 @@ async def listen(ws_url: str, site: str, out, dedup: Dedup, state: dict):
                     # data["ol"] - онлайн сайта; data["ld"] - список дропов
                     if data.get("ol") is not None:
                         state["online"] = data["ol"]
-                    store(data.get("ld") or [], out, dedup, state["online"])
+                    store(data.get("ld") or [], out, dedup)
         except (websockets.ConnectionClosed, OSError, asyncio.TimeoutError) as e:
             print(f"[ws] обрыв: {e!r}, переподключение через {delay} с", file=sys.stderr)
         await asyncio.sleep(delay)
@@ -346,9 +343,9 @@ async def main():
     try:
         initial, ws_url, case_catalog = read_page(args.site)
         CASE_PRICES.update(case_catalog)
-        #print(f"[init] кейсов в каталоге: {len(case_catalog)}", file=sys.stderr)
+        print(f"[init] кейсов в каталоге: {len(case_catalog)}", file=sys.stderr)
     except requests.RequestException as e:
-        #print(f"[warn] страница недоступна: {e!r}", file=sys.stderr)
+        print(f"[warn] страница недоступна: {e!r}", file=sys.stderr)
         pass
     ws_url = normalize_ws_url(args.ws) or ws_url
     if not ws_url:
@@ -358,8 +355,8 @@ async def main():
     state = {"online": None, "raw": 2 if args.raw else 0}
     with open(args.out, "a", encoding="utf-8") as out:
         if initial:
-            #print(f"[init] стартовых дропов со страницы: {len(initial)}", file=sys.stderr)
-            store(initial, out, dedup, state["online"])
+            print(f"[init] стартовых дропов со страницы: {len(initial)}", file=sys.stderr)
+            store(initial, out, dedup)
         await listen(ws_url, args.site, out, dedup, state)
 
 
