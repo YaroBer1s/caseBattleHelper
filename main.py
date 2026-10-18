@@ -86,6 +86,7 @@ CASE_PRICE_KEYS = ("price", "cost", "amount")
 # Ключ — название кейса, значение — его цена в валюте сайта.
 CASE_PRICES = {}
 last_rois = []
+pos_neg = []
 
 def get_case_reference_price(case: dict):
     """Ищет цену кейса по названию из каталога, включая slug из live-дропа."""
@@ -242,8 +243,10 @@ def summarize(d: dict, online) -> str:
         try:
             if price*0.9 > case_price:
                 arrow = paint(f'↑ ({roi:+.1f}%)', 46)
+                pos_neg.append(1)
             elif price < case_price:
                 arrow = paint(f'↓ ({roi:+.1f}%)', 196)
+                pos_neg.append(0)
             else:
                 arrow = paint(f'- ({roi:+.1f}%)', 226)
 
@@ -289,8 +292,9 @@ def store(drops, out, dedup: Dedup, online) -> int:
                     sum_roi += roi
             avg_roi = sum_roi / len(last_rois)
 
-            print(f"AVG ROI: {avg_roi:3.2f}%  ===================================================================================")
+            print(f"\n>>> AVG ROI: {avg_roi:3.2f}% AVG +/-: {sum(pos_neg)/len(pos_neg)*100:3.1f}%")
 
+    pos_neg.clear()
     last_rois.clear()
     out.flush()
     return new
