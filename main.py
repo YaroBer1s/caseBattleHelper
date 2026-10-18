@@ -24,10 +24,8 @@ import sys
 import time
 from collections import deque
 from datetime import datetime
-
 import requests
 import websockets
-import subprocess
 
 # Консоль Windows часто не в UTF-8, а в названиях есть кириллица и "★": без этого будет UnicodeEncodeError.
 for _stream in (sys.stdout, sys.stderr):
@@ -271,7 +269,7 @@ def store(drops, out, dedup: Dedup) -> int:
     new = 0
 
     if drops:
-        subprocess.run("cls" if os.name == "nt" else "clear",)
+        os.system("cls" if os.name == "nt" else "clear")
         for d in drops:
             if d.get("source") in (2, 3):
                 continue
