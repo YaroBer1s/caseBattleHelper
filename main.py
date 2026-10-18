@@ -19,6 +19,7 @@ import asyncio
 import base64
 import json
 import os
+from os import system
 import html as html_lib
 import re
 import sys
@@ -69,7 +70,7 @@ def setup_colors(disable: bool) -> bool:
     if disable or os.environ.get("NO_COLOR") or not sys.stdout.isatty():
         pass
     if os.name == "nt":
-        os.system("")  # включает обработку ANSI-последовательностей в консоли Windows 10+
+        system("")  # включает обработку ANSI-последовательностей в консоли Windows 10+
     return True
 
 
@@ -84,7 +85,7 @@ CASE_PRICE_KEYS = ("price", "cost", "amount")
 # Заполняется автоматически из каталога кейсов на странице сайта при запуске.
 # Ключ — название кейса, значение — его цена в валюте сайта.
 CASE_PRICES = {}
-
+last_rois = []
 
 def get_case_reference_price(case: dict):
     """Ищет цену кейса по названию из каталога, включая slug из live-дропа."""
@@ -193,12 +194,19 @@ class Dedup:
         self._set, self._order, self._limit = set(), deque(), limit
 
     def seen(self, key) -> bool:
+        # Без ID невозможно надёжно определить, является ли дроп повтором.
+        if key is None or key == "":
+            return False
+
         if key in self._set:
             return True
+
         self._set.add(key)
         self._order.append(key)
+
         if len(self._order) > self._limit:
             self._set.discard(self._order.popleft())
+
         return False
 
 
@@ -218,23 +226,42 @@ def case_part(d: dict, case: dict) -> str:
 
 def summarize(d: dict, online) -> str:
     asset = d.get("asset") or {}
-    user = d.get("user") or {}
+    #user = d.get("user") or {}
     case = d.get("case") or {}
+    case_price = get_case_reference_price(case)
     price = d.get("price") if d.get("price") is not None else asset.get("price")
     rarity = asset.get("rarity")
     color = RARITY_COLORS.get(rarity)
+
+    roi = return_percent(price, case)
+
+    if roi is not None:
+        last_rois.append(roi)
+
+    if price is not None and case_price is not None:
+        try:
+            if price*0.9 > case_price:
+                arrow = paint(f'↑ ({roi:+.1f}%)', 46)
+            elif price*1.1 < case_price:
+                arrow = paint(f'↓ ({roi:+.1f}%)', 196)
+            else:
+                arrow = paint(f'- ({roi:+.1f}%)', 226)
+
+        except (TypeError, ValueError):
+            arrow = paint("?", 250)
+    else:
+        arrow = paint("?", 250)
     item_name = str(asset.get("name") or asset.get("title") or "?") + (
         " [контейнер]" if asset.get("type") == TYPE_CONTAINER else ""
     )
     # Окупаемость показываем только для кейсов, чья цена есть в CASE_PRICES.
-    roi = return_percent(price, case)
-    if roi is not None:
-        item_name += f" ({roi:+.1f}%)"
+
     parts = [
+        arrow,
         datetime.now().strftime("%H:%M:%S"),
         #f"онлайн {online if online is not None else '?'}",
         paint(item_name, color),
-        f"{price if price is not None else '?'} RUB",
+        f"{price if price is not None else '?'}",
         case_part(d, case)
     ]
     return " · ".join(parts)
@@ -242,6 +269,8 @@ def summarize(d: dict, online) -> str:
 
 def store(drops, out, dedup: Dedup, online) -> int:
     new = 0
+    if new > 0:
+        os.system("cls")
     for d in drops:
         if d.get("source") in (2, 3):
             continue
@@ -251,6 +280,17 @@ def store(drops, out, dedup: Dedup, online) -> int:
         new += 1
         out.write(json.dumps({"ts": time.time(), "drop": d}, ensure_ascii=False) + "\n")
         print(summarize(d, online), flush=True)
+
+    if len(last_rois) > 0 and drops:
+        sum_roi = 0
+        for roi in last_rois:
+            if roi:
+                sum_roi += roi
+        avg_roi = sum_roi / len(last_rois)
+
+    print(f"AVG ROI: {avg_roi:3.2f}%  ===================================================================================")
+    last_rois.clear()
+
     out.flush()
     return new
 
