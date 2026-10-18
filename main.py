@@ -264,7 +264,7 @@ async def listen(ws_url: str, site: str, out, dedup: Dedup, state: dict):
                 ping_interval=20,
                 ping_timeout=20,
             ) as ws:
-                print(f"[ws] подключено: {ws_url}", file=sys.stderr)
+                #print(f"[ws] подключено: {ws_url}", file=sys.stderr)
                 delay = 1
                 async for raw in ws:
                     try:
@@ -299,9 +299,10 @@ async def main():
     try:
         initial, ws_url, case_catalog = read_page(args.site)
         CASE_PRICES.update(case_catalog)
-        print(f"[init] кейсов в каталоге: {len(case_catalog)}", file=sys.stderr)
+        #print(f"[init] кейсов в каталоге: {len(case_catalog)}", file=sys.stderr)
     except requests.RequestException as e:
-        print(f"[warn] страница недоступна: {e!r}", file=sys.stderr)
+        #print(f"[warn] страница недоступна: {e!r}", file=sys.stderr)
+        pass
     ws_url = normalize_ws_url(args.ws) or ws_url
     if not ws_url:
         sys.exit("Адрес WebSocket не найден. Передайте его через --ws (см. шапку файла).")
@@ -310,7 +311,7 @@ async def main():
     state = {"online": None, "raw": 2 if args.raw else 0}
     with open(args.out, "a", encoding="utf-8") as out:
         if initial:
-            print(f"[init] стартовых дропов со страницы: {len(initial)}", file=sys.stderr)
+            #print(f"[init] стартовых дропов со страницы: {len(initial)}", file=sys.stderr)
             store(initial, out, dedup, state["online"])
         await listen(ws_url, args.site, out, dedup, state)
 
