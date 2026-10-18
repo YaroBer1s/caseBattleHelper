@@ -242,7 +242,7 @@ def summarize(d: dict, online) -> str:
         try:
             if price*0.9 > case_price:
                 arrow = paint(f'↑ ({roi:+.1f}%)', 46)
-            elif price*1.1 < case_price:
+            elif price < case_price:
                 arrow = paint(f'↓ ({roi:+.1f}%)', 196)
             else:
                 arrow = paint(f'- ({roi:+.1f}%)', 226)
@@ -269,28 +269,29 @@ def summarize(d: dict, online) -> str:
 
 def store(drops, out, dedup: Dedup, online) -> int:
     new = 0
-    if new > 0:
-        os.system("cls")
-    for d in drops:
-        if d.get("source") in (2, 3):
-            continue
 
-        if dedup.seen(d.get("id")):
-            continue
-        new += 1
-        out.write(json.dumps({"ts": time.time(), "drop": d}, ensure_ascii=False) + "\n")
-        print(summarize(d, online), flush=True)
+    if drops:
+        os.system("cls" if os.name == "nt" else "clear")
+        for d in drops:
+            if d.get("source") in (2, 3):
+                continue
 
-    if len(last_rois) > 0 and drops:
-        sum_roi = 0
-        for roi in last_rois:
-            if roi:
-                sum_roi += roi
-        avg_roi = sum_roi / len(last_rois)
+            if dedup.seen(d.get("id")):
+                continue
+            new += 1
+            out.write(json.dumps({"ts": time.time(), "drop": d}, ensure_ascii=False) + "\n")
+            print(summarize(d, online), flush=True)
 
-    print(f"AVG ROI: {avg_roi:3.2f}%  ===================================================================================")
+        if len(last_rois) > 0:
+            sum_roi = 0
+            for roi in last_rois:
+                if roi:
+                    sum_roi += roi
+            avg_roi = sum_roi / len(last_rois)
+
+            print(f"AVG ROI: {avg_roi:3.2f}%  ===================================================================================")
+
     last_rois.clear()
-
     out.flush()
     return new
 
